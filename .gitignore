@@ -6,6 +6,7 @@ venv/
 
 # Ignore captured image data
 data/captured/
+Images/
 
 # Ignore system files
 src/__pycache__/

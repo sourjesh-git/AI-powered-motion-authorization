@@ -6,3 +6,5 @@ tensorflow
 requests
 python-dotenv
 serial
+streamlit
+
