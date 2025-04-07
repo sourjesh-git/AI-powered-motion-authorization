@@ -1,0 +1,17 @@
+# Ignore Python virtual environments
+venv/
+
+# Ignore dotenv environment variables
+.env
+
+# Ignore captured image data
+data/captured/
+
+# Ignore system files
+src/__pycache__/
+*.pyc
+
+# VSCode and OS metadata
+.vscode/
+.DS_Store
+Thumbs.db

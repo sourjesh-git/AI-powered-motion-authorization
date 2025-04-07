@@ -1,0 +1,8 @@
+opencv-python
+numpy
+pillow
+pyserial
+tensorflow
+requests
+python-dotenv
+serial
