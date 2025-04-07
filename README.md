@@ -141,7 +141,10 @@ python main.py
 
 ## 👨‍💻 Author
 
-Made with ❤️ by [Your Name]
+IIITK 2022 ECE BATCH PROJECT
+Sourjesh Mukherjee 2022BEC0007
+Suchit Paul Santosh 2022BEC0006
+Aadith Abhimanyu 2022BEC0015
 
 ---
 
