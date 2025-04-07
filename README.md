@@ -54,6 +54,20 @@ ESP32 (Ultrasonic Sensor)
      - Sends an email with image attached.
    - Tells ESP32 to resume motion detection.
 
+
+---
+## 🔋 Power Optimization
+
+This project now uses **ESP32 Deep Sleep mode** to reduce power usage. After detecting motion, the ESP32 sleeps for 10 seconds, waking only for meaningful sensing activity.
+
+### Benefits:
+- Great for battery-powered use cases.
+- Reduces unnecessary sensor polling.
+
+### How it Works:
+- On motion detection, ESP32 triggers sleep for a fixed time.
+- Wakes up and continues distance tracking.
+
 ---
 
 ## 📁 Directory Structure
@@ -142,8 +156,10 @@ python main.py
 ## 👨‍💻 Author
 
 IIITK 2022 ECE BATCH PROJECT
-Sourjesh Mukherjee 2022BEC0007
+Sourjesh Mukherjee 2022BEC0007 
+
 Suchit Paul Santosh 2022BEC0006
+
 Aadith Abhimanyu 2022BEC0015
 
 ---
