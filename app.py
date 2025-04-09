@@ -6,6 +6,10 @@ import yaml
 from PIL import Image
 import streamlit_authenticator as stauth
 from yaml.loader import SafeLoader
+from utils.cctv_stream import start_stream
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ---------------- CONFIG ----------------
 LOG_FILE = "logs/detections.log"
@@ -106,3 +110,14 @@ elif authentication_status:
     if auto_refresh:
         time.sleep(5)
         st.rerun()
+
+    if user_role == "Admin":
+        st.subheader("🟢 Admin Tools")
+    
+    if st.button("Start Live CCTV Stream"):
+        cctv_url = os.getenv("CCTV_STREAM_URL")
+        if cctv_url:
+            start_stream(cctv_url)
+        else:
+            st.error("CCTV URL not set in .env file")
+
