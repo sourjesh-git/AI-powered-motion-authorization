@@ -16,3 +16,6 @@ src/__pycache__/
 .vscode/
 .DS_Store
 Thumbs.db
+
+#Ignore credentials for authoerization
+/config/credentials.yaml    
