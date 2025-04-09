@@ -9,4 +9,4 @@ serial
 streamlit
 streamlit-authenticator=0.2.2
 pyYAML
-
+streamlit-webrtc
