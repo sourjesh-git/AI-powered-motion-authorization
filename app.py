@@ -8,6 +8,8 @@ import streamlit_authenticator as stauth
 from yaml.loader import SafeLoader
 from utils.cctv_stream import start_stream
 from dotenv import load_dotenv
+from db import get_connection, log_detection_to_db, fetch_logs
+
 
 load_dotenv()
 
@@ -65,6 +67,18 @@ elif authentication_status:
                     return timestamp, image_path
         return None, None
 
+    def log_detection(status, image_path):
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        log_line = f"{timestamp} | {status} | {image_path}\n"
+
+        # Log to file
+        os.makedirs("logs", exist_ok=True)
+        with open(LOG_FILE, "a") as f:
+            f.write(log_line)
+
+        # Log to NeonDB
+        log_detection_to_db(timestamp, status, image_path)
+
     def get_latest_captured_image():
         files = glob.glob(os.path.join(CAPTURE_DIR, "*.jpg"))
         if not files:
@@ -97,6 +111,29 @@ elif authentication_status:
         else:
             st.warning("No log file found.")
 
+    def display_db_logs():
+        st.subheader("🗄 Logs from Database")
+        logs = fetch_logs()
+        if not logs:
+            st.info("No logs in the database yet.")
+            return
+
+        for log in logs:
+            try:
+                # Handle both 3-field and 4-field log tuples
+                if len(log) == 4:
+                    _, timestamp, status, image_path = log
+                elif len(log) == 3:
+                    timestamp, status, image_path = log
+                else:
+                    continue  # Skip malformed rows
+
+                st.markdown(f"**Time:** {timestamp}  |  **Status:** {status}")
+                if image_path and os.path.exists(image_path):
+                    st.image(image_path, use_container_width=True)
+            except Exception as e:
+                st.error(f"Error displaying log: {e}")
+
     # ---------------- DISPLAY SECTIONS ----------------
     if user_role == "Admin":
         display_latest_intruder_log()
@@ -113,7 +150,7 @@ elif authentication_status:
 
     if user_role == "Admin":
         st.subheader("🟢 Admin Tools")
-    
+
     if st.button("Start Live CCTV Stream"):
         cctv_url = os.getenv("CCTV_STREAM_URL")
         if cctv_url:
@@ -121,3 +158,5 @@ elif authentication_status:
         else:
             st.error("CCTV URL not set in .env file")
 
+    if user_role == "Admin":
+        display_db_logs()
