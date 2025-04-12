@@ -5,8 +5,10 @@ from dotenv import load_dotenv
 from src.serial_listener import wait_for_trigger
 from src.camera import capture_images
 from src.predictor import predict
-from src.notifier import send_alert
-from db import log_detection_to_db  # <- Add this
+from src.notifier import send_alert  # Email
+from src.notifier_tg import send_telegram_alert  # Telegram
+from db import log_detection_to_db
+from utils.location import get_location_info  # NEW: for location sharing
 
 # Load environment variables
 load_dotenv()
@@ -15,17 +17,13 @@ VERIFIED_LABEL = "Authorized"
 LOG_PATH = "logs/detections.log"
 
 def log_event(status, image_path):
-    """Log detection to file and database."""
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
 
-    # File logging
     os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
     with open(LOG_PATH, "a") as f:
         f.write(f"{timestamp} | {status} | {image_path}\n")
 
-    # Database logging
     log_detection_to_db(timestamp, status, image_path)
-
 
 def run_pipeline():
     print("\n📸 Capturing images...")
@@ -48,14 +46,24 @@ def run_pipeline():
             print(f"✅ Authorized person detected: {img_path}")
             log_event("AUTHORIZED", img_path)
             return "authorized"
+
         else:
             print(f"🚨 Intruder detected: {img_path}")
-            print("📧 Sending alert email...")
+            log_event("ALERT", img_path)
+
+            print("📧 Sending email alert...")
             try:
                 send_alert(img_path)
             except Exception as e:
-                print(f"⚠️ Failed to send email: {e}")
-            log_event("ALERT", img_path)
+                print(f"⚠️ Email failed: {e}")
+
+            print("📨 Sending Telegram alert...")
+            try:
+                location = get_location_info()  # Returns dict with 'city', 'country', etc.
+                send_telegram_alert(img_path, location)
+            except Exception as e:
+                print(f"⚠️ Telegram failed: {e}")
+
             return "intruder"
 
     print("⚠️ No conclusive prediction made.")
@@ -73,22 +81,16 @@ if __name__ == "__main__":
         result = run_pipeline()
         ser.close()
 
-        if result == "intruder":
-            print("🛑 Intruder alert handled. Exiting.")
+        if result in ["intruder", "authorized"]:
+            print("✅ Detection handled. Exiting.")
             break
 
-        elif result == "authorized":
-            print("🟢 Authorized detection complete. Exiting.")
-            break
-
-        else:
-            # If nothing conclusive, resume ESP32
-            print("📨 Sending 'resume' to ESP32...")
-            try:
-                ser = wait_for_trigger()
-                ser.write(b"resume\n")
-                time.sleep(0.5)
-                ser.close()
-            except Exception as e:
-                print(f"⚠️ Failed to send 'resume': {e}")
-            print("\n🔁 Waiting for next motion trigger...\n")
+        print("📨 Sending 'resume' to ESP32...")
+        try:
+            ser = wait_for_trigger()
+            ser.write(b"resume\n")
+            time.sleep(0.5)
+            ser.close()
+        except Exception as e:
+            print(f"⚠️ Resume send failed: {e}")
+        print("\n🔁 Waiting for next trigger...\n")
