@@ -6,9 +6,8 @@ from src.serial_listener import wait_for_trigger
 from src.camera import capture_images
 from src.predictor import predict
 from src.notifier import send_alert  # Email
-from src.notifier_tg import send_telegram_alert  # Telegram
-from db import log_detection_to_db
-from utils.location import get_location_info  # NEW: for location sharing
+from src.notifier_telegram import send_telegram_alert, send_tg_location  # Telegram
+from db import log_detection_to_db 
 
 # Load environment variables
 load_dotenv()
@@ -59,7 +58,7 @@ def run_pipeline():
 
             print("📨 Sending Telegram alert...")
             try:
-                location = get_location_info()  # Returns dict with 'city', 'country', etc.
+                location = send_tg_location()
                 send_telegram_alert(img_path, location)
             except Exception as e:
                 print(f"⚠️ Telegram failed: {e}")

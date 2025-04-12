@@ -10,13 +10,12 @@ from utils.cctv_stream import start_stream
 from dotenv import load_dotenv
 from db import get_connection, log_detection_to_db, fetch_logs
 
-
 load_dotenv()
 
 # ---------------- CONFIG ----------------
 LOG_FILE = "logs/detections.log"
 CAPTURE_DIR = "data/captured"
-st.set_page_config(page_title="Intruder Detection Dashboard", layout="centered")
+st.set_page_config(page_title="AI-Powered Intrusion Detection", layout="centered")
 
 # ---------------- AUTHENTICATION ----------------
 with open("config/credentials.yaml") as file:
@@ -29,6 +28,9 @@ authenticator = stauth.Authenticate(
     config['cookie']['expiry_days'],
     config['preauthorized']
 )
+
+# Display message for recruiters to use the given password and username
+st.info("**Recruiters**: If you are a Recruiter, I have been expecting you! Please use the username `recruiter_guest` and password `password_guest2809` to log in as a guest.")
 
 name, authentication_status, username = authenticator.login("Login", "main")
 
@@ -47,9 +49,8 @@ elif authentication_status:
     user_role = config['credentials']['usernames'][username]['role']
 
     # ---------------- DASHBOARD HEADER ----------------
-    st.title("AI Powered Motion Authorization")
-    st.subheader("Intruder/Authorization Dashboard")
-    st.markdown("This dashboard displays the latest intruder detection logs and captured images.")
+    st.title("Percepta – Caught in the Act")
+    st.subheader("We watch the uninvited.")
 
     auto_refresh = st.checkbox("🔁 Auto-refresh every 5 seconds", value=False)
 
@@ -93,15 +94,10 @@ elif authentication_status:
             st.info("No intruder has been detected yet.")
             return
         st.write(f"**Time:** {timestamp}")
-        st.image(image_path, caption="Intruder Captured Image", use_container_width=True)
-
-    def display_latest_capture():
-        st.subheader("📸 Latest Captured Image")
-        latest_img = get_latest_captured_image()
-        if not latest_img:
-            st.info("No images have been captured yet.")
-            return
-        st.image(latest_img, caption="Most Recent Capture", use_container_width=True)
+        if user_role in ["Admin", "Guest"]:
+            st.image(image_path, caption="Latest Captured Image", use_container_width=True)
+        elif user_role == "Viewer":
+            st.write(f"**Image Path:** {image_path}")
 
     def display_full_log():
         st.subheader("📜 View Full Detection Log")
@@ -120,25 +116,27 @@ elif authentication_status:
 
         for log in logs:
             try:
-                # Handle both 3-field and 4-field log tuples
                 if len(log) == 4:
                     _, timestamp, status, image_path = log
                 elif len(log) == 3:
                     timestamp, status, image_path = log
                 else:
-                    continue  # Skip malformed rows
+                    continue
 
                 st.markdown(f"**Time:** {timestamp}  |  **Status:** {status}")
-                if image_path and os.path.exists(image_path):
+
+                if user_role == "Admin" and image_path and os.path.exists(image_path):
                     st.image(image_path, use_container_width=True)
+                elif user_role == "Viewer":
+                    st.write(f"**Image Path:** {image_path}")
+                elif user_role == "Guest":
+                    st.caption("Image hidden for privacy.")
+
             except Exception as e:
                 st.error(f"Error displaying log: {e}")
 
     # ---------------- DISPLAY SECTIONS ----------------
-    if user_role == "Admin":
-        display_latest_intruder_log()
-
-    display_latest_capture()
+    display_latest_intruder_log()  # Show for all roles
 
     if user_role == "Admin":
         display_full_log()
@@ -148,15 +146,21 @@ elif authentication_status:
         time.sleep(5)
         st.rerun()
 
-    if user_role == "Admin":
-        st.subheader("🟢 Admin Tools")
+    # ---------------- LIVE CCTV STREAM (Guest/Admin) ----------------
+    if user_role == "Admin" or user_role == "Guest":
+        st.subheader("🟢 Live CCTV Stream")
 
-    if st.button("Start Live CCTV Stream"):
-        cctv_url = os.getenv("CCTV_STREAM_URL")
+        # Prompt for CCTV URL input (Guest/Admin)
+        cctv_url = st.text_input("Enter your CCTV stream URL (e.g., http://192.168.x.x:8080/video)", 
+                                 value="", help="Make sure your phone and system are on the same Wi-Fi network.")
+
         if cctv_url:
-            start_stream(cctv_url)
+            st.write("Connecting to CCTV stream...")
+            try:
+                start_stream(cctv_url)  # Start the stream
+            except Exception as e:
+                st.error(f"Failed to start stream: {e}")
         else:
-            st.error("CCTV URL not set in .env file")
+            st.info("To access the feature, please have IP Webcam installed from your App Store! Then enter the CCTV stream URL with '/video' at the end .")
 
-    if user_role == "Admin":
-        display_db_logs()
+    display_db_logs()  # Show for all roles
