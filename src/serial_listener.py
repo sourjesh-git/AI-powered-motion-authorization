@@ -3,7 +3,7 @@
 import serial
 import time
 
-SERIAL_PORT = 'COM3'
+SERIAL_PORT = 'COM9'
 BAUD_RATE = 115200
 
 def wait_for_trigger():
