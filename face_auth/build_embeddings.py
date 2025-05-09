@@ -1,67 +1,94 @@
 import os
+import uuid
+import cv2
 import pickle
-from tqdm import tqdm
+import numpy as np
+from datetime import datetime
 from deepface import DeepFace
-from deepface.commons import functions
 
 # Constants
+EMBEDDINGS_PATH = "data/embeddings/authorized_embeddings.pkl"
+CAPTURED_DIR = "data/captured"
 MODEL_NAME = "Facenet"
-TARGET_SIZE = (160, 160)
-ENFORCE_DETECTION = True
-DETECTOR_BACKEND = "mtcnn"  # More reliable than opencv
-KNOWN_FACES_DIR = os.path.join(os.path.dirname(__file__), "known_faces")
-OUTPUT_EMBEDDINGS_PATH = os.path.join(os.path.dirname(__file__), "embeddings", "authorized_embeddings.pkl")
+ENFORCE_DETECTION = False
+DISTANCE_THRESHOLD = 0.4
 
-def load_model(model_name=MODEL_NAME):
-    print(f"[INFO] Loading DeepFace backend model: {model_name}")
-    model = DeepFace.build_model(model_name)
-    print("[INFO] Model loaded successfully.")
-    return model
+def capture_image():
+    print("[INFO] Accessing camera...")
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        raise Exception("Camera could not be opened.")
 
-def get_embedding(model, img_path):
+    ret, frame = cap.read()
+    cap.release()
+
+    if not ret:
+        raise Exception("Failed to capture image.")
+
+    os.makedirs(CAPTURED_DIR, exist_ok=True)
+    image_name = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}.jpg"
+    image_path = os.path.join(CAPTURED_DIR, image_name)
+    cv2.imwrite(image_path, frame)
+    print(f"[INFO] Image captured and saved to: {image_path}")
+    return image_path
+
+def extract_embedding(image_path):
+    print("[INFO] Extracting face embedding from captured image...")
     try:
-        face = functions.preprocess_face(
-            img=img_path,
-            target_size=TARGET_SIZE,
-            enforce_detection=ENFORCE_DETECTION,
-            detector_backend=DETECTOR_BACKEND
+        embedding_obj = DeepFace.represent(
+            img_path=image_path,
+            model_name=MODEL_NAME,
+            enforce_detection=ENFORCE_DETECTION
         )
-        embedding = model.predict(face)[0].tolist()
-        return embedding
+        return np.array(embedding_obj[0]["embedding"])
     except Exception as e:
-        print(f"[ERROR] Failed to process {img_path}: {e}")
-        return None
+        raise Exception(f"Failed to extract embedding: {e}")
 
-def build_embeddings():
-    if not os.path.exists(KNOWN_FACES_DIR):
-        raise FileNotFoundError(f"Known faces directory not found: {KNOWN_FACES_DIR}")
+def load_embeddings():
+    print(f"[INFO] Loading known embeddings from: {EMBEDDINGS_PATH}")
+    if not os.path.exists(EMBEDDINGS_PATH):
+        raise FileNotFoundError(f"Embeddings file not found at: {EMBEDDINGS_PATH}")
     
-    model = load_model()
-    embeddings_db = {}
+    with open(EMBEDDINGS_PATH, "rb") as f:
+        embeddings_db = pickle.load(f)
 
-    print(f"[INFO] Scanning known faces in: {KNOWN_FACES_DIR}")
-    for filename in tqdm(os.listdir(KNOWN_FACES_DIR), desc="Embedding Faces"):
-        filepath = os.path.join(KNOWN_FACES_DIR, filename)
+    return embeddings_db
 
-        if not os.path.isfile(filepath):
-            continue
+def verify_identity(input_embedding, embeddings_db):
+    print("[INFO] Verifying identity...")
+    best_match = None
+    best_distance = float("inf")
 
-        name = os.path.splitext(filename)[0]
-        embedding = get_embedding(model, filepath)
+    for name, embeddings in embeddings_db.items():
+        for i, stored_embedding in enumerate(embeddings):
+            distance = np.linalg.norm(input_embedding - stored_embedding)
+            print(f"[DEBUG] Compared with {name} [sample {i+1}]: distance = {distance:.4f}")
+            if distance < best_distance:
+                best_distance = distance
+                best_match = name
 
-        if embedding:
-            embeddings_db[name] = embedding
-        else:
-            print(f"[WARN] Skipping '{filename}' due to detection failure.")
+    if best_distance < DISTANCE_THRESHOLD:
+        return "verified", best_match, best_distance
+    else:
+        return "unverified", "unknown", best_distance
 
-    if not embeddings_db:
-        raise RuntimeError("No embeddings were generated. Check face images or detection settings.")
+def main():
+    try:
+        image_path = capture_image()
+        embedding = extract_embedding(image_path)
+        embeddings_db = load_embeddings()
+        status, identity, best_distance = verify_identity(embedding, embeddings_db)
 
-    os.makedirs(os.path.dirname(OUTPUT_EMBEDDINGS_PATH), exist_ok=True)
-    with open(OUTPUT_EMBEDDINGS_PATH, "wb") as f:
-        pickle.dump(embeddings_db, f)
+        result = {
+            "status": status,
+            "identity": identity,
+            "distance": best_distance,
+            "image_path": image_path,
+        }
 
-    print(f"[SUCCESS] Stored {len(embeddings_db)} embeddings at: {OUTPUT_EMBEDDINGS_PATH}")
+        print(f"[RESULT] {result}")
+    except Exception as e:
+        print(f"[ERROR] {e}")
 
 if __name__ == "__main__":
-    build_embeddings()
+    main()

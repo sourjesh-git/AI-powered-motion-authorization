@@ -13,4 +13,8 @@ streamlit-webrtc
 psycopg2-binary
 deepface
 Flask
+tf-keras
+pickle
+scikit-learn
+scipy
 
